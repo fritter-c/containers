@@ -4,11 +4,15 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
 /*
  * Allocators that will be used by gtr containers.
  * A valid allocator for a single buffer gtr container must implement
  * malloc, realloc and free (NOTE: realloc must support shrinking)
+ * The C++ standard allocator interface is also implemented.
  */
 namespace gtr {
 namespace containers {
@@ -17,12 +21,25 @@ namespace containers {
  * C-allocator (deafult allocator for most gtr containers)
  */
 template <typename T> struct c_allocator {
+    // C++ standard allocator
+    using value_type = T;
+    template <typename U> struct rebind {
+        typedef c_allocator<U> other;
+    };
+    T *allocate(std::size_t n) { return malloc(n); }
+    void deallocate(T *p, std::size_t n) { return free(p, n); }
+    template <class U> c_allocator(const c_allocator<U> &) noexcept {}
+    template <class U> bool operator==(const c_allocator<U> &) const noexcept { return true; }
+    template <class U> bool operator!=(const c_allocator<U> &) const noexcept { return false; }
+
+    // GTR standard allocator
     inline T *malloc(std::size_t size) { return reinterpret_cast<T *>(std::malloc(size * sizeof(T))); }
     inline T *realloc(T *ptr, std::size_t size, std::size_t old_size) {
         (void)old_size;
         return reinterpret_cast<T *>(std::realloc(ptr, size * sizeof(T)));
     }
     inline constexpr void free(void *ptr, std::size_t size) { (void)size, std::free(ptr); }
+
     constexpr c_allocator(){};
     c_allocator(c_allocator<T> &&other) noexcept = default;
     c_allocator(const c_allocator<T> &other) = default;
@@ -34,9 +51,21 @@ template <typename T> struct c_allocator {
  * Static allocator
  */
 template <typename T, int N = 256 * 1024> struct static_allocator {
-    std::byte buffer[N];
+    alignas(std::max_align_t) std::byte buffer[N];
     std::size_t used = 0;
 
+    // C++ standard allocator
+    using value_type = T;
+    template <typename U> struct rebind {
+        typedef static_allocator<U, N> other;
+    };
+    T *allocate(std::size_t n) { return malloc(n); }
+    void deallocate(T *p, std::size_t n) { return free(p, n); }
+    template <class U> static_allocator(const static_allocator<U, N> &) noexcept {}
+    template <class U> bool operator==(const static_allocator<U, N> &) const noexcept { return true; }
+    template <class U> bool operator!=(const static_allocator<U, N> &) const noexcept { return false; }
+
+    // GTR standard allocator
     inline T *malloc(std::size_t size) {
         size_t off = get_offset();
         if (used + off + size * sizeof(T) >= N)
@@ -79,5 +108,7 @@ template <typename T, int N = 256 * 1024> struct static_allocator {
 };
 }; // namespace containers
 }; // namespace gtr
-
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 #endif

@@ -8,7 +8,7 @@ namespace gtr {
 namespace containers {
 template <int N = 32> struct static_string {
     using value_type = char;
-    static constexpr std::size_t npos = -1;
+    static constexpr std::size_t npos = (std::size_t)-1;
     static constexpr std::size_t nul_index = N - 1;
 
     value_type data[N];
@@ -33,7 +33,7 @@ template <int N = 32> struct static_string {
     inline static_string(static_string &&other) noexcept = default;
 
     template <int U> inline static_string(static_string<U> &&other) noexcept {
-        std::memcpy(data, other.data, N);
+        std::memcpy(data, other.data, U > N ? N : U);
         data[nul_index] = '\0';
     }
     // Copy assignment operator
@@ -65,6 +65,20 @@ template <int N = 32> struct static_string {
 
     // Operator+= to concatenate another string
     inline static_string &operator+=(const value_type *other) { return append(other); }
+
+    inline static_string operator+(const value_type c) {
+        static_string result = *this;
+        result.append(c);
+        return result;
+    }
+
+    inline static_string operator+(const value_type *other) {
+        static_string result = *this;
+        result.append(other);
+        return result;
+    }
+
+    inline static_string operator+(const static_string &other) { return operator+(other); }
 
     // Friend declaration for << operator
     inline friend std::ostream &operator<<(std::ostream &os, const static_string &str) {
@@ -114,7 +128,7 @@ template <int N = 32> struct static_string {
         return npos;
     }
 
-    inline const value_type operator[](std::size_t index) const {
+    inline value_type operator[](std::size_t index) const {
         assert(index < N);
         return data[index];
     }
@@ -126,10 +140,18 @@ template <int N = 32> struct static_string {
 
     inline operator const value_type *() const { return data; }
 
+    // iterators
+    inline value_type *begin() { return data; }
+    
+    inline value_type *end() { return data + size(); }
+    
+    inline const value_type *begin() const { return data; }
+    
+    inline const value_type *end() const { return data + size(); }
+
     // Destructor
     inline ~static_string() = default;
 };
-}; // namespace containers
-}; // namespace gtr
-
-#endif
+};     // namespace containers
+};     // namespace gtr
+#endif // STATICSTRING_H

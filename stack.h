@@ -17,9 +17,11 @@ template <typename T, class Allocator = c_allocator<T>> struct stack : private _
     std::size_t capacity;
 
     Allocator &allocator() { return _allocator_ebo<T, Allocator>::get_allocator(); }
+
     const Allocator &allocator() const { return _allocator_ebo<T, Allocator>::get_allocator(); }
 
     inline constexpr std::size_t size_in_bytes() const { return size * sizeof(T); }
+
     inline constexpr void _free_all() { allocator().free(data, capacity); }
 
     inline stack() : _allocator_ebo<T, Allocator>() {

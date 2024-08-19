@@ -1,16 +1,32 @@
 #ifndef TRACKING_ALLOCATOR_H
 #define TRACKING_ALLOCATOR_H
+#include <cassert>
 #include <cstddef>
 #include <exception>
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
-
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
 namespace gtr {
 namespace containers {
 template <typename T> struct tracking_allocator {
     // To be used by the container
     std::unordered_set<void *> ptrs;
+    // C++ standard allocator
+    using value_type = T;
+    template <typename U> struct rebind {
+        typedef tracking_allocator<U> other;
+    };
+    T *allocate(std::size_t n) { return malloc(n); }
+    void deallocate(T *p, std::size_t n) { return free(p, n); }
+    template <class U> tracking_allocator(const tracking_allocator<U> &) noexcept {}
+    template <class U> bool operator==(const tracking_allocator<U> &) const noexcept { return true; }
+    template <class U> bool operator!=(const tracking_allocator<U> &) const noexcept { return false; }
+
+    // GTR standard allocator
     inline T *malloc(std::size_t size) {
         auto ptr = std::malloc(size * sizeof(T) + sizeof(std::size_t));
         ptrs.insert((void *)(((std::size_t *)ptr) + 1));
@@ -39,10 +55,7 @@ template <typename T> struct tracking_allocator {
         std::free((std::size_t *)ptr - 1);
     }
 
-    ~tracking_allocator() {
-        if (!ptrs.empty())
-            assert(false, "possible memory leak");
-    }
+    ~tracking_allocator() { assert(ptrs.empty() == true); }
     tracking_allocator(){};
     tracking_allocator(tracking_allocator<T> &&other) noexcept : ptrs(std::move(other.ptrs)){};
     tracking_allocator(const tracking_allocator<T> &other){};
@@ -57,4 +70,7 @@ template <typename T> struct tracking_allocator {
 
 }; // namespace containers
 }; // namespace gtr
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 #endif

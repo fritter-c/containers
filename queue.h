@@ -13,6 +13,7 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct queue : pri
     linked_list<T, Allocator> list;
 
     Allocator &allocator() { return _allocator_ebo<T, Allocator>::get_allocator(); }
+
     const Allocator &allocator() const { return _allocator_ebo<T, Allocator>::get_allocator(); }
 
     inline constexpr std::size_t size_in_bytes() const { return list.size * sizeof(T); }
@@ -62,7 +63,6 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct queue : pri
 
     inline ~queue() { _free_all(); }
 };
-} // namespace containers
-} // namespace gtr
-
+};     // namespace containers
+};     // namespace gtr
 #endif // !QUEUE_H

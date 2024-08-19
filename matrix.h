@@ -21,18 +21,13 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
     const Allocator &allocator() const { return _allocator_ebo<T, Allocator>::get_allocator(); }
 
     inline constexpr std::size_t size_in_bytes() const { return columns * sizeof(T) * rows; }
+
     inline constexpr void _free_all() {
         if (data)
             allocator().free(data, capacity);
     }
-    inline std::size_t _element_size() { return columns * sizeof(T); }
 
-    inline matrix(std::size_t columns) {
-        data = allocator().malloc(columns);
-        capacity = 1;
-        rows = 0;
-        this->columns = columns;
-    }
+    inline std::size_t _element_size() { return columns * sizeof(T); }
 
     inline matrix() {
         capacity = 0;
@@ -41,9 +36,9 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
         data = nullptr;
     }
 
-    inline void set_matrix(std::size_t rows, std::size_t columns) {
+    inline void set_matrix(std::size_t _rows, std::size_t _columns) {
         _free_all();
-        *this = matrix<T>(rows, columns);
+        *this = matrix<T>(_rows, _columns);
     }
 
     inline bool is_set() { return data != nullptr; }
@@ -77,7 +72,9 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
     inline matrix<T> &operator=(const matrix<T> &other) {
         if (data)
             _free_all();
-        data = std::memcpy(allocator().malloc(other.columns * other.capacity), other.data, other.rows * other.capacity);
+    
+        data = allocator().malloc(other.size_in_bytes()); 
+        std::memcpy(data, other.data, other.size_in_bytes());
         rows = other.rows;
         columns = other.columns;
         capacity = other.capacity;
@@ -85,7 +82,7 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
     }
 
     inline matrix<T> &operator=(matrix<T> &&other) noexcept {
-        if (this != other) {
+        if (this != &other) {
             if (data)
                 _free_all();
             allocator() = std::move(other.allocator());
@@ -94,15 +91,23 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
             columns = other.columns;
             capacity = other.capacity;
             other.data = nullptr;
-            return *this;
+
         }
+        return *this;
     }
 
-    inline void reserve(const std::size_t _Reserve) {
+    inline constexpr void reserve(const std::size_t _Reserve) {
         if (_Reserve > capacity) {
             data = allocator().realloc(data, columns * _Reserve, columns * capacity);
             capacity = _Reserve;
         }
+    }
+
+    inline constexpr void resize(const std::size_t _Rows) {
+		if (_Rows > capacity) {
+			reserve(_Rows);
+		}
+		rows = _Rows;
     }
 
     constexpr inline void push_back(const T *element) {
@@ -130,6 +135,7 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
         assert(rows);
         return data[(rows - 1) * columns];
     }
+
     inline const value_type &first() const {
         assert(rows);
         return data[0];
@@ -141,16 +147,16 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
     }
 
     inline value_type operator[](std::size_t row) {
-        assert(row >= 0 && row < rows);
+        assert(row < rows);
         return data + row * columns;
     }
 
-    inline const value_type operator[](std::size_t row) const {
-        assert(row >= 0 && row < rows);
+    inline value_type operator[](std::size_t row) const {
+        assert(row < rows);
         return data + row * columns;
     }
     inline operator const value_type *() const { return data; }
 };
-}; // namespace containers
-} // namespace gtr
-#endif
+};     // namespace containers
+};     // namespace gtr
+#endif // MATRIX_H

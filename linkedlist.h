@@ -9,6 +9,7 @@ template <typename T> struct node {
     node *next;
     node *prev;
 };
+
 template <typename T, class Allocator = c_allocator<node<T>>> struct linked_list : private _allocator_ebo<T, Allocator> {
     struct iterator {
         node<T> *current;
@@ -33,6 +34,7 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct linked_list
     std::size_t size;
 
     Allocator &allocator() { return _allocator_ebo<T, Allocator>::get_allocator(); }
+
     const Allocator &allocator() const { return _allocator_ebo<T, Allocator>::get_allocator(); }
 
     inline linked_list() : _allocator_ebo<T, Allocator>() {
@@ -193,8 +195,11 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct linked_list
     }
 
     inline iterator begin() { return head; }
+
     inline iterator end() { return nullptr; }
+
     inline const iterator begin() const { return head; }
+
     inline const iterator end() const { return nullptr; }
 
     inline void reverse() {
@@ -211,9 +216,9 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct linked_list
     }
 
     inline T &front() { return head->data; }
+
     inline T &back() { return tail->data; }
 };
-}; // namespace containers
-}; // namespace gtr
-
+};     // namespace containers
+};     // namespace gtr
 #endif // !LINKEDLIST_H
