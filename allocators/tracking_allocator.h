@@ -13,18 +13,7 @@
 namespace gtr {
 namespace containers {
 template <typename T> struct tracking_allocator {
-    // To be used by the container
     std::unordered_set<void *> ptrs;
-    // C++ standard allocator
-    using value_type = T;
-    template <typename U> struct rebind {
-        typedef tracking_allocator<U> other;
-    };
-    T *allocate(std::size_t n) { return malloc(n); }
-    void deallocate(T *p, std::size_t n) { return free(p, n); }
-    template <class U> tracking_allocator(const tracking_allocator<U> &) noexcept {}
-    template <class U> bool operator==(const tracking_allocator<U> &) const noexcept { return true; }
-    template <class U> bool operator!=(const tracking_allocator<U> &) const noexcept { return false; }
 
     // GTR standard allocator
     inline T *malloc(std::size_t size) {
