@@ -1,9 +1,9 @@
 #ifndef QUEUE_H
 #define QUEUE_H
+#include <initializer_list>
 #include "allocator_base.h"
 #include "allocators/allocators.h"
 #include "linkedlist.h"
-#include <initializer_list>
 
 namespace gtr {
 namespace containers {
@@ -113,6 +113,13 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct queue : pri
     inline void push(const T &value) { list.push_back(value); }
 
     /**
+     * @brief Add an element to the back of the queue (alias for push).
+     *
+     * @param value The value to add.
+     */
+    inline void push_back(const T &value) { list.push_back(value); }
+
+    /**
      * @brief Remove the element at the front of the queue.
      */
     inline void pop_front() { list.pop_front(); }
@@ -128,6 +135,13 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct queue : pri
      * @param value The value to enqueue.
      */
     inline void enqueue(const T &value) { list.push_back(value); }
+
+    /**
+     * @brief Push an element to the back of the queue.
+     *
+     * @param value The value to push.
+     */
+    inline void pop_back() { list.pop_back(); }
 
     /**
      * @brief Get a reference to the element at the front of the queue.

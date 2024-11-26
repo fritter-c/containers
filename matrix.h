@@ -1,8 +1,8 @@
 #ifndef MATRIX_H
 #define MATRIX_H
+#include <cassert>
 #include "allocator_base.h"
 #include "allocators/allocators.h"
-#include <cassert>
 
 namespace gtr {
 namespace containers {
@@ -15,9 +15,12 @@ namespace containers {
  * NOTE: The matrix is stored in column-major order because this is the only way to make a dynamic matrix(I think).
  * that pushes elements in O(1) time. This is because the matrix is stored in a single buffer and the elements are
  * pushed in the buffer as rows.
- * 
+ *
  */
 template <typename T, typename Allocator = c_allocator<T>> struct matrix : private _allocator_ebo<T, Allocator> {
+    static_assert(std::is_arithmetic<T>::value, "Matrix type must be arithmetic.");
+    static_assert(std::is_trivially_copyable<T>::value, "Matrix type must be trivially copyable.");
+
     using value_type = T *;
     using iterator = value_type *;
     using const_interator = const value_type *;
@@ -27,9 +30,26 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
      * @brief A helper struct representing a buffer in the matrix.
      */
     struct buffer {
+        T *data;           /**< The pointer to the buffer data. */
         std::size_t width; /**< The width of the buffer. */
         std::size_t count; /**< The total number of elements in the buffer. */
-        T *data;           /**< The pointer to the buffer data. */
+
+        struct iterator {
+            T *data;
+            std::size_t width;
+            std::size_t row;
+
+            iterator(T *data, std::size_t width, std::size_t row) : data(data), width(width), row(row) {}
+
+            T &operator*() { return data[row * width]; }
+
+            iterator &operator++() {
+                row++;
+                return *this;
+            }
+
+            bool operator!=(const iterator &other) { return row != other.row; }
+        };
 
         /**
          * @brief Constructs a buffer object.
@@ -38,7 +58,7 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
          * @param a_count The total number of elements in the buffer.
          * @param a_data The pointer to the buffer data.
          */
-        inline constexpr buffer(std::size_t a_width, std::size_t a_count, T *a_data) : width(a_width), count(a_count), data(a_data){};
+        inline constexpr buffer(std::size_t a_width, std::size_t a_count, T *a_data) : data(a_data), width(a_width), count(a_count) {};
 
         /**
          * @brief Pre-increment operator for the buffer.
@@ -58,7 +78,7 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
          */
         inline T &operator[](std::size_t row) {
             assert(row * width < count);
-            return *(data + width * row);
+            return data[width * row];
         }
 
         /**
@@ -69,15 +89,43 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
          */
         const inline T &operator[](std::size_t row) const {
             assert(row * width < count);
-            return *(data + width * row);
+            return data[width * row];
         }
 
         /**
-         * @brief Conversion operator to T*.
+         * @brief Returns the number of rows in the buffer.
          *
-         * @return The pointer to the buffer data.
+         * @return The number of rows in the buffer.
          */
-        inline operator T *() { return data; }
+        std::size_t size() const { return count / width; }
+
+        /**
+         * @brief Returns an iterator to the beginning of the buffer.
+         *
+         * @return An iterator to the beginning of the buffer.
+         */
+        iterator begin() { return iterator(data, width, 0); }
+
+        /**
+         * @brief Returns an iterator to the end of the buffer.
+         *
+         * @return An iterator to the end of the buffer.
+         */
+        iterator end() { return iterator(data, width, size()); }
+
+        /**
+         * @brief Returns a const iterator to the beginning of the buffer.
+         *
+         * @return A const iterator to the beginning of the buffer.
+         */
+        const iterator begin() const { return iterator(data, width, 0); }
+
+        /**
+         * @brief Returns a const iterator to the end of the buffer.
+         *
+         * @return A const iterator to the end of the buffer.
+         */
+        const iterator end() const { return iterator(data, width, size()); }
     };
 
     T *data;              /**< The pointer to the matrix data. */
@@ -109,10 +157,7 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
     /**
      * @brief Frees all allocated memory in the matrix.
      */
-    inline constexpr void _free_all() {
-        if (data)
-            this->free(data, capacity);
-    }
+    inline constexpr void _free_all() { this->free(data, capacity); }
 
     /**
      * @brief Returns the size of a single element in the matrix.
@@ -156,6 +201,7 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
      * @param columns The number of columns.
      */
     inline constexpr matrix(std::size_t rows, std::size_t columns) {
+        assert(rows && columns);
         data = this->malloc(columns * rows);
         capacity = rows;
         this->columns = columns;
@@ -189,8 +235,7 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
      * @brief Destructor for the matrix.
      */
     inline ~matrix() {
-        if (data)
-            _free_all();
+        _free_all();
         data = nullptr;
     }
 
@@ -201,8 +246,7 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
      * @return The reference to the assigned matrix.
      */
     inline matrix<T> &operator=(const matrix<T> &other) {
-        if (data)
-            _free_all();
+        _free_all();
 
         data = this->malloc(other.size_in_bytes());
         std::memcpy(data, other.data, other.size_in_bytes());
@@ -220,8 +264,7 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
      */
     inline matrix<T> &operator=(matrix<T> &&other) noexcept {
         if (this != &other) {
-            if (data)
-                _free_all();
+            _free_all();
             allocator() = std::move(other.allocator());
             data = other.data;
             rows = other.rows;
@@ -274,46 +317,6 @@ template <typename T, typename Allocator = c_allocator<T>> struct matrix : priva
      * @brief Clears the matrix.
      */
     inline void clear() { rows = 0; }
-
-    /**
-     * @brief Returns a reference to the last element in the matrix.
-     *
-     * @return The reference to the last element in the matrix.
-     */
-    inline value_type &last() {
-        assert(rows);
-        return data[(rows - 1) * columns];
-    }
-
-    /**
-     * @brief Returns a reference to the first element in the matrix.
-     *
-     * @return The reference to the first element in the matrix.
-     */
-    inline value_type &first() {
-        assert(rows);
-        return data[0];
-    }
-
-    /**
-     * @brief Returns a const reference to the last element in the matrix.
-     *
-     * @return The const reference to the last element in the matrix.
-     */
-    inline const value_type &last() const {
-        assert(rows);
-        return data[(rows - 1) * columns];
-    }
-
-    /**
-     * @brief Returns a const reference to the first element in the matrix.
-     *
-     * @return The const reference to the first element in the matrix.
-     */
-    inline const value_type &first() const {
-        assert(rows);
-        return data[0];
-    }
 
     /**
      * @brief Removes the last element from the matrix.

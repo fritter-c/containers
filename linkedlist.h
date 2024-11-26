@@ -201,6 +201,7 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct linked_list
         node<T> *current = head;
         while (current) {
             node<T> *next = current->next;
+            current->~node();
             allocator().free(current, 1);
             current = next;
         }
@@ -236,6 +237,7 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct linked_list
      */
     inline void push_front(const T &value) {
         node<T> *new_node = this->malloc(1);
+        new (new_node) node<T>();
         new_node->data = value;
         new_node->next = head;
         new_node->prev = nullptr;
@@ -280,6 +282,7 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct linked_list
                 head = nullptr;
                 tail = nullptr;
             }
+            old_head->~node();
             this->free(old_head, 1);
             size--;
         }
@@ -307,6 +310,7 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct linked_list
                     tail = current->prev;
                 }
                 node<T> *next = current->next;
+                current->~node();
                 this->free(current, 1);
                 current = next;
                 size--;
@@ -373,6 +377,13 @@ template <typename T, class Allocator = c_allocator<node<T>>> struct linked_list
      * @return Reference to the last element.
      */
     inline T &back() { return tail->data; }
+
+    /**
+     * @brief Checks if the linked list is empty.
+     *
+     * @return true if the linked list is empty, false otherwise.
+     */
+    inline bool empty() { return !head; }
 };
 } // namespace containers
 } // namespace gtr
