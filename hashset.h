@@ -26,6 +26,9 @@ template <typename Key> struct hashset_bucket {
     template <typename, class, class, class>
     friend struct hashset;
 
+    bool occupied() const { return _flags & HASHSET_BUCKET_OCCUPIED; }
+    bool tombstone() const { return _flags & HASHSET_BUCKET_TOMBSTONE; }
+    bool available() const { return !(_flags & (HASHSET_BUCKET_OCCUPIED | HASHSET_BUCKET_TOMBSTONE)); }
   private:
     uint8_t _flags;
     uint64_t _hash;
@@ -59,7 +62,7 @@ struct hashset : private _allocator_ebo<hashset_bucket<Key>, Allocator> {
             return *this;
         }
 
-        inline iterator &operator++(int) {
+        inline iterator operator++(int) {
             iterator temp = *this;
             do {
                 ++pointer;
@@ -290,12 +293,12 @@ struct hashset : private _allocator_ebo<hashset_bucket<Key>, Allocator> {
         std::size_t probes = 0;
 
         while (probes < capacity) {
-            if (bucket->_flags & HASHSET_BUCKET_OCCUPIED) {
+            if (bucket->occupied()) {
                 if (bucket->_hash == hash_created && CompFunc()(bucket->key, key)) {
                     // Found existing key
                     return bucket;
                 }
-            } else if (bucket->_flags & HASHSET_BUCKET_OCCUPIED) {
+            } else if (bucket->tombstone()) {
                 // Record the first tombstone to reuse it later
                 if (!first_tombstone) {
                     first_tombstone = bucket;

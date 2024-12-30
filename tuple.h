@@ -10,7 +10,7 @@ struct tuple;
 // Base case: empty tuple
 template <>
 struct tuple<> {
-    tuple() {}
+    tuple() = default;
 };
 
 // Recursive case

@@ -28,7 +28,7 @@ template <typename Key, typename T> struct hashmap_bucket {
     T value;
     template <typename, class, class, class, class>
     friend struct hashmap;
-    inline bool ocupied() { return _flags & HASHMAP_BUCKET_OCCUPIED; }
+    inline bool occupied() { return _flags & HASHMAP_BUCKET_OCCUPIED; }
     inline bool tombstone() { return _flags & HASHMAP_BUCKET_TOMBSTONE; }
     inline bool empty() { return !(_flags & (HASHMAP_BUCKET_OCCUPIED | HASHMAP_BUCKET_TOMBSTONE)); }
     inline bool available() { return !(_flags & HASHMAP_BUCKET_OCCUPIED); }
@@ -47,7 +47,7 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
         hashmap_bucket<Key, T> *end_ptr;
 
         inline constexpr iterator(hashmap_bucket<Key, T> *ptr, hashmap_bucket<Key, T> *end) : pointer(ptr), end_ptr(end) {
-            if (pointer != end_ptr && !(pointer->ocupied()))
+            if (pointer != end_ptr && !(pointer->occupied()))
                 operator++();
         }
 
@@ -58,7 +58,7 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
         inline iterator &operator++() {
             do {
                 ++pointer;
-            } while (pointer != end_ptr && !pointer->ocupied());
+            } while (pointer != end_ptr && !pointer->occupied());
             return *this;
         }
 
@@ -66,14 +66,14 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
             iterator temp = *this;
             do {
                 ++pointer;
-            } while (pointer != end_ptr && !pointer->ocupied());
+            } while (pointer != end_ptr && !pointer->occupied());
             return temp;
         }
 
         inline iterator &operator--() {
             do {
                 --pointer;
-            } while (pointer != end_ptr && !pointer->ocupied());
+            } while (pointer != end_ptr && !pointer->occupied());
             return *this;
         }
 
@@ -81,7 +81,7 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
             iterator temp = *this;
             do {
                 --pointer;
-            } while (pointer != end_ptr && !pointer->ocupied());
+            } while (pointer != end_ptr && !pointer->occupied());
             return temp;
         }
 
@@ -276,7 +276,7 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
         std::size_t probes = 0;
 
         while (probes < capacity) {
-            if (bucket->ocupied()) {
+            if (bucket->occupied()) {
                 if (bucket->_hash == hash_created && CompFunc()(bucket->key, key)) {
                     // Found existing key
                     return bucket;
@@ -333,7 +333,7 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
         if (reserve > capacity) {
             hashmap map(reserve);
             for (std::size_t i = 0; i < capacity; i++) {
-                if (data[i].ocupied()) {
+                if (data[i].occupied()) {
                     map.add_with_hash(data[i].key, std::move(data[i].value), data[i]._hash);
                 }
             }
@@ -385,7 +385,7 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
             return end();
         std::size_t key_hash = (std::size_t)-1;
         auto bucket = get_bucket(key, key_hash);
-        return bucket ? (bucket->ocupied()) ? iterator(bucket, data + capacity) : end() : end();
+        return bucket ? (bucket->occupied()) ? iterator(bucket, data + capacity) : end() : end();
     }
 
     /**
@@ -411,7 +411,7 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
         std::size_t key_probe = probe(key_hash);
 
         while (probes < capacity) {
-            if (bucket->ocupied()) {
+            if (bucket->occupied()) {
                 if (bucket->_hash == key_hash && CompFunc()(bucket->key, key)) {
                     return iterator(bucket, data + capacity);
                 }
@@ -448,7 +448,7 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
             return end();
         }
 
-        if (bucket->ocupied()) {
+        if (bucket->occupied()) {
             // Key already exists, update the value
             bucket->value = value;
             return iterator(bucket, data + capacity);
@@ -483,7 +483,7 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
             return end();
         }
 
-        if (bucket->ocupied()) {
+        if (bucket->occupied()) {
             // Key already exists, update the value
             bucket->value = std::move(value);
             return iterator(bucket, data + capacity);
@@ -579,6 +579,7 @@ struct hashmap : private _allocator_ebo<hashmap_bucket<Key, T>, Allocator> {
                     bucket.value.~T();
                 }
             }
+            std::memset((char *)(void *)data, 0, capacity * bucket_size());
         }
     }
 

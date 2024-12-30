@@ -25,7 +25,7 @@ template <int N = 64, class Allocator = c_allocator<char>> struct text : private
     static_assert(N >= 2 * sizeof(std::size_t), "Text N must be at least 2 * sizeof(std::size_t)");
 
     char *data;           /**< Pointer to the underlying data array. */
-    char local_buffer[N]; /**< Local buffer for small strings. */
+    char local_buffer[N]{}; /**< Local buffer for small strings. */
 
     using value_type = char;
     using size_type = std::size_t;
@@ -33,6 +33,15 @@ template <int N = 64, class Allocator = c_allocator<char>> struct text : private
 
     Allocator &allocator() { return _allocator_ebo<char, Allocator>::get_allocator(); }
     const Allocator &allocator() const { return _allocator_ebo<char, Allocator>::get_allocator(); }
+
+    /**
+     * @brief Constructs an inline text object.
+     *
+     * Initializes the text object with a local buffer, sets the size to 0,
+     * capacity to N-1, and marks the data as local. The first character of
+     * the buffer is set to the null terminator.
+     */
+    inline constexpr text() : _allocator_ebo<char, Allocator>(), data(local_buffer) { }
 
     /**
      * @brief Returns the size of the text container.
@@ -104,14 +113,6 @@ template <int N = 64, class Allocator = c_allocator<char>> struct text : private
      */
     inline bool local_data() const { return data == local_buffer; }
 
-    /**
-     * @brief Constructs an inline text object.
-     *
-     * Initializes the text object with a local buffer, sets the size to 0,
-     * capacity to N-1, and marks the data as local. The first character of
-     * the buffer is set to the null terminator.
-     */
-    inline constexpr text() : _allocator_ebo<char, Allocator>(), data(local_buffer) { local_buffer[0] = '\0'; }
 
     /**
      * @brief Formats a string using a printf-style format string and variable arguments.
@@ -1169,15 +1170,15 @@ template <int N = 64, class Allocator = c_allocator<char>> struct text : private
     }
 };
 } // namespace containers
+using text16 = containers::text<16>;
+using text32 = containers::text<32>;
+using text64 = containers::text<64>;
+using text128 = containers::text<128>;
+using text256 = containers::text<256>;
+using text512 = containers::text<512>;
+using text1024 = containers::text<1024>;
+using text2048 = containers::text<2048>;
+using text4096 = containers::text<4096>;
+using string = text64;
 } // namespace gtr
-
-typedef gtr::containers::text<16> text16;
-typedef gtr::containers::text<32> text32;
-typedef gtr::containers::text<64> text64;
-typedef gtr::containers::text<128> text128;
-typedef gtr::containers::text<256> text256;
-typedef gtr::containers::text<512> text512;
-typedef gtr::containers::text<1024> text1024;
-typedef gtr::containers::text<2048> text2048;
-typedef gtr::containers::text<4096> text4096;
 #endif

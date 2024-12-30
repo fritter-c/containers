@@ -12,7 +12,7 @@ namespace containers {
  * @brief Deque implementation using a block map.
  */
 template <typename T, class Allocator = c_allocator<T>> struct deque : private _allocator_ebo<T, Allocator> {
-    static constexpr std::size_t BLOCK_SIZE = 4096;
+    static constexpr std::size_t BLOCK_SIZE = 2048;
     using value_type = T;
     using allocator_type = Allocator;
 
@@ -221,7 +221,9 @@ template <typename T, class Allocator = c_allocator<T>> struct deque : private _
     void push_front(const T &value) {
         if (block_map == nullptr) {
             initialize_map();
-        } else if (start_offset == 0) {
+        }
+        if (start_offset == 0) {
+            // If we are at the very front and cannot move left, resize the map first
             if (front_block == 0) {
                 resize_map();
             }
@@ -551,12 +553,11 @@ template <typename T, class Allocator = c_allocator<T>> struct deque : private _
         std::size_t offset;
     };
 
-  private:
     /**
      * @brief Initializes the block map.
      */
     void initialize_map() {
-        map_size = 8;
+        map_size = 4;
         block_map = reinterpret_cast<T **>(allocator().malloc(map_size * sizeof(T *)));
         std::memset(block_map, 0, map_size * sizeof(T *));
         front_block = back_block = map_size / 2;
@@ -564,6 +565,7 @@ template <typename T, class Allocator = c_allocator<T>> struct deque : private _
         start_offset = end_offset = 0;
     }
 
+#
     /**
      * @brief Resizes the block map.
      */
@@ -571,13 +573,21 @@ template <typename T, class Allocator = c_allocator<T>> struct deque : private _
         std::size_t new_map_size = map_size * 2;
         T **new_block_map = reinterpret_cast<T **>(allocator().malloc(new_map_size * sizeof(T *)));
         std::memset(new_block_map, 0, new_map_size * sizeof(T *));
+
         std::size_t blocks_in_use = back_block - front_block + 1;
+
+        // Ensure we have at least one free block at the front after resizing
         std::size_t new_front_block = (new_map_size - blocks_in_use) / 2;
+        if (new_front_block == 0) {
+            new_front_block = 1;
+        }
+
         std::memcpy(new_block_map + new_front_block, block_map + front_block, blocks_in_use * sizeof(T *));
+
         allocator().free(block_map, map_size * sizeof(T *));
         block_map = new_block_map;
         front_block = new_front_block;
-        back_block = front_block + blocks_in_use - 1;
+        back_block = new_front_block + blocks_in_use - 1;
         map_size = new_map_size;
     }
 };
