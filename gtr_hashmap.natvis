@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <!-- Visualization for the hashmap buckets -->
+  <Type Name="gtr::containers::hashmap_bucket&lt;*,*&gt;">
+    <Expand>
+      <!-- Display the core contents of the bucket -->
+      <Item Name="key">key</Item>
+      <Item Name="value">value</Item>
+      <!-- Show flags and convenience methods if you like -->
+      <Item Name="flags">_flags</Item>
+      <Item Name="occupied"> _flags == 1</Item>
+      <Item Name="tombstone">_flags > 1</Item>
+    </Expand>
+  </Type>
+
+  <!-- Visualization for the hashmap itself -->
+  <Type Name="gtr::containers::hashmap&lt;*,*&gt;">
+    <!-- Display the size and capacity at a glance -->
+    <DisplayString>Size={size}, Capacity={capacity}</DisplayString>
+
+    <Expand>
+      <!-- Expose size/capacity as top-level items -->
+      <Item Name="size">size</Item>
+      <Item Name="capacity">capacity</Item>
+
+      <!-- List out only the occupied buckets -->
+      <CustomListItems>
+        <Variable Name="i" InitialValue="0"/>
+        <!-- We'll iterate up to 'capacity', but only show items for buckets that are occupied. -->
+        <Size>capacity</Size>
+        <Loop>
+          <Break Condition="i == capacity"/>
+          <!-- HASHMAP_BUCKET_OCCUPIED is (1 << 0) = 1, so check if (_flags & 1) != 0 -->
+            <Item> data[i].key, data[i]
+            </Item>
+          <Exec> ++i </Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>

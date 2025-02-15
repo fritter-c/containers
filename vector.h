@@ -1,15 +1,23 @@
 #ifndef VECTOR_H
 #define VECTOR_H
+#include <algorithm>
 #include <cassert>
+#include <concepts>
 #include <initializer_list>
 #include <limits>
+#include <numeric>
 #include <type_traits>
 #include "allocator_base.h"
 #include "allocators/allocators.h"
 
 namespace gtr {
 namespace containers {
-
+template <typename U>
+concept has_basic_comp = requires(U t) {
+    { t == t } -> std::same_as<bool>;
+    { t < t } -> std::same_as<bool>;
+    { t > t } -> std::same_as<bool>;
+};
 template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_ebo<T, Allocator> {
     using value_type = T;
     using iterator = value_type *;
@@ -19,6 +27,7 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
     using const_reference = const value_type &;
     using size_type = std::size_t;
     using diffence_type = std::ptrdiff_t;
+    static constexpr size_type npos = static_cast<size_type>(-1);
 
     T *data;         ///< Pointer to the beginning of the allocated storage.
     T *data_end;     ///< Pointer to one past the last constructed element.
@@ -92,6 +101,135 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
     }
 
     /**
+     * @brief Sets the metadata size for the allocator.
+     *
+     * This function sets the metadata size for the allocator associated with the vector.
+     * It is only available when the allocator type is `meta_allocator<T>`.
+     *
+     * @param size The size of the metadata to set.
+     */
+    inline void set_metadata_size(size_type size)
+        requires(std::is_same_v<Allocator, meta_allocator<T>>)
+    {
+
+        assert(empty());
+        _free_all();
+        data_end = capacity_end = data;
+        allocator().metadata_size = size;
+    }
+
+    /**
+     * @brief Retrieves the metadata size from the allocator.
+     *
+     * This function returns the metadata size from the allocator associated with the vector.
+     * It is only available when the allocator type is `meta_allocator<T>`.
+     *
+     * @return std::size_t The size of the metadata.
+     */
+    inline std::size_t get_metadata_size() const
+        requires(std::is_same_v<Allocator, meta_allocator<T>>)
+    {
+        return allocator().metadata_size;
+    }
+
+    /**
+     * @brief Retrieves a pointer to the metadata.
+     *
+     * This function returns a pointer to the metadata associated with the vector.
+     * It is only available when the allocator type is `meta_allocator<T>`.
+     *
+     * @tparam U The type of the metadata.
+     * @return U* Pointer to the metadata, or nullptr if the vector is empty.
+     */
+    template <typename U>
+    inline U *get_metadata()
+        requires(std::is_same_v<Allocator, meta_allocator<T>> && std::is_standard_layout_v<U>)
+    {
+        if (data)
+            return reinterpret_cast<U *>(allocator().get_metadata(data));
+        return nullptr;
+    }
+
+    /**
+     * @brief Retrieves a constant pointer to the object.
+     *
+     * This function returns a constant pointer to the object associated with the vector.
+     * It is only available when the allocator type is `object_allocator<T, U>`.
+     *
+     * @tparam U The type of the object.
+     * @return const U* Constant pointer to the object, or nullptr if the vector is empty.
+     */
+    template <typename Alloc = Allocator>
+        requires(is_object_allocator_v<Alloc>)
+    const inline typename Alloc::object_type *get_object() const {
+        if (data)
+            return allocator().get_object(data);
+        return nullptr;
+    }
+
+    /**
+     * @brief Retrieves a pointer to the object.
+     *
+     * This function returns a pointer to the object associated with the vector.
+     * It is only available when the allocator type is `object_allocator<T, U>`.
+     *
+     * @tparam U The type of the object.
+     * @return U* Pointer to the object, or nullptr if the vector is empty.
+     */
+    template <typename Alloc = Allocator>
+        requires(is_object_allocator_v<Alloc>)
+    inline typename Alloc::object_type *get_object() {
+        if (data)
+            return allocator().get_object(data);
+        return nullptr;
+    }
+
+    /**
+     * @brief Retrieves a constant pointer to the metadata.
+     *
+     * This function returns a constant pointer to the metadata associated with the vector.
+     * It is only available when the allocator type is `meta_allocator<T>`.
+     *
+     * @tparam U The type of the metadata.
+     * @return const U* Constant pointer to the metadata, or nullptr if the vector is empty.
+     */
+    template <typename U>
+    inline const U *get_metadata() const
+        requires(std::is_same_v<Allocator, meta_allocator<T>> && std::is_standard_layout_v<U>)
+    {
+        if (data)
+            return reinterpret_cast<const U *>(allocator().get_metadata(data));
+        return nullptr;
+    }
+
+    /**
+     * @brief Creates the metadata for the vector.
+     *
+     * This function creates the metadata for the vector. It is only available when
+     * the allocator type is `meta_allocator<T>`. The metadata is create by initializing
+     * the vector with a single element.
+     */
+    inline void create_metadata()
+        requires(std::is_same_v<Allocator, meta_allocator<T>>)
+    {
+        reserve(1);
+    }
+
+    /**
+     * @brief Creates the object for the vector.
+     *
+     * This function creates the object for the vector. It is only available when
+     * the allocator type is `object_allocator<T, T>`. The object is created by initializing
+     * the vector with a single element.
+     */
+    template <typename U>
+    inline void create_object()
+        requires(std::is_same_v<Allocator, object_allocator<T, U>>)
+    {
+        reserve(1);
+    }
+
+    /**
      * @brief Frees all allocated memory for the vector.
      *
      * This function destroys all elements in the vector and then frees the memory
@@ -100,6 +238,7 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
     inline void _free_all() {
         destroy_all();
         allocator().free(data, capacity());
+        data = nullptr;
     }
 
     /**
@@ -176,12 +315,23 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
      *
      * @param other The vector to be copied.
      */
-    inline vector(const vector<T, Allocator> &other) : _allocator_ebo<T, Allocator>(other.allocator()) {
+    inline vector(const vector<T, Allocator> &other)
+        : _allocator_ebo<T, Allocator>(other.allocator())
+
+    {
         data = allocator().malloc(other.capacity());
         capacity_end = data + other.capacity();
         data_end = data + other.size();
         for (size_type i = 0; i < size(); i++) {
             new (data + i) T(other.data[i]);
+        }
+
+        if constexpr (is_object_allocator_v<Allocator>) {
+            if (other.capacity()) {
+                auto *a = get_object();
+                auto *b = other.get_object();
+                *a = *b;
+            }
         }
     }
 
@@ -203,6 +353,7 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
         other.data = nullptr;
         other.data_end = nullptr;
         other.capacity_end = nullptr;
+        // Even if the allocator is an object allocator, we can still move the object because its only a pointer
     }
 
     /**
@@ -227,6 +378,13 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
             data_end = data + other.size();
             for (size_type i = 0; i < size(); i++) {
                 new (data + i) T(other.data[i]);
+            }
+            if constexpr (is_object_allocator_v<Allocator>) {
+                if (other.capacity()) {
+                    auto *obj = other.get_object();
+                    auto *this_obj = get_object();
+                    *obj = *this_obj;
+                }
             }
         }
         return *this;
@@ -404,7 +562,7 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
      * @param new_capacity The minimum number of elements to reserve storage for.
      */
     inline void reserve(size_type new_capacity) {
-        if constexpr (std::is_trivially_copyable<T>::value) {
+        if constexpr (std::is_trivially_copyable<T>::value && !is_object_allocator_v<Allocator>) {
             if (new_capacity > capacity()) {
                 size_type sz = size();
                 data = allocator().realloc(data, new_capacity, capacity());
@@ -420,6 +578,11 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
                     ptr->~T();
                 }
                 if (data) {
+                    if constexpr (is_object_allocator_v<Allocator>) {
+                        auto *obj = get_object();
+                        auto *new_obj = allocator().get_object(new_data);
+                        *new_obj = std::move(*obj);
+                    }
                     allocator().free(data, capacity());
                 }
                 data = new_data;
@@ -475,6 +638,97 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
             }
         }
     }
+
+    /**
+     * @brief Assigns new contents to the vector, replacing its current contents.
+     *
+     * This function replaces the current contents of the vector with the elements
+     * from the provided initializer list. It first clears the vector and then appends
+     * the elements from the initializer list.
+     *
+     * @param init_list The initializer list containing the elements to assign to the vector.
+     */
+    void assign_buffer(T *buffer, size_type size)
+        requires std::is_same_v<Allocator, c_allocator<T>>
+    {
+        if (data) {
+            _free_all();
+        }
+        data = buffer;
+        data_end = data + size;
+        capacity_end = data_end;
+    }
+
+    /**
+     * @brief Assigns the contents of another vector to this vector.
+     *
+     * This function replaces the current contents of the vector with the elements
+     * from the provided vector. It first checks for self-assignment and then deallocates
+     * any existing data if necessary. It then allocates new memory and copies the elements
+     * from the other vector to this vector.
+     *
+     * @param other The vector whose contents are to be assigned to this vector.
+     */
+    inline void assign(const vector<T, Allocator> &other) {
+        if (this != &other) {
+            if (data) {
+                _free_all();
+            }
+            allocator() = other.allocator();
+            data = allocator().malloc(other.capacity());
+            capacity_end = data + other.capacity();
+            data_end = data + other.size();
+            for (size_type i = 0; i < size(); i++) {
+                new (data + i) T(other.data[i]);
+            }
+        }
+    }
+
+    /**
+     * @brief Assigns the contents of an initializer list to this vector.
+     *
+     * This function replaces the current contents of the vector with the elements
+     * from the provided initializer list. It first clears the vector and then appends
+     * the elements from the initializer list.
+     *
+     * @param init_list The initializer list containing the elements to assign to the vector.
+     */
+    inline void assign(std::initializer_list<T> init_list) {
+        clear();
+        reserve(init_list.size());
+        for (const auto &item : init_list) {
+            new (data_end) T(item);
+            ++data_end;
+        }
+    }
+
+    /**
+     * @brief Assigns the specified number of copies of a value to the vector.
+     *
+     * This function replaces the current contents of the vector with the specified
+     * number of copies of the given value. It first clears the vector and then appends
+     * the specified number of copies of the value.
+     *
+     * @param count The number of copies to assign to the vector.
+     * @param value The value to be assigned to the vector.
+     */
+    inline void assign(size_type count, const T &value) {
+        clear();
+        reserve(count);
+        for (size_type i = 0; i < count; i++) {
+            new (data_end) T(value);
+            ++data_end;
+        }
+    }
+
+    /**
+     * @brief Reverses the order of the elements in the vector.
+     *
+     * This function reverses the order of the elements in the vector in place.
+     * After calling this function, the first element will become the last, the second
+     * element will become the second to last, and so on.
+     */
+    inline void reverse() { std::reverse(begin(), end()); }
 
     /**
      * @brief Accesses the element at the specified index.
@@ -575,6 +829,150 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
     }
 
     /**
+     * @brief Searches for the first occurrence of a value in the vector.
+     *
+     * This function searches for the first occurrence of the specified value
+     * in the vector. If the value is found, the function returns the index of
+     * the first occurrence; otherwise, it returns npos.
+     *
+     * @param value The value to search for in the vector.
+     * @param ordered Whether the vector is ordered (sorted) or not.
+     * @return The index of the first occurrence of the value, or npos if not found.
+     */
+    inline size_type find(const T &value, bool ordered = false) const
+        requires has_basic_comp<T>
+    {
+        if (!ordered) {
+            for (size_type i = 0; i < size(); i++) {
+                if (data[i] == value) {
+                    return i;
+                }
+            }
+            return npos;
+        } else {
+            size_type low = 0;
+            size_type high = size() - 1;
+            while (low <= high) {
+                size_type mid = low + (high - low) / 2;
+                if (data[mid] == value) {
+                    return mid;
+                }
+                if (data[mid] < value) {
+                    low = mid + 1;
+                } else {
+                    high = mid - 1;
+                }
+            }
+            return npos;
+        }
+    }
+
+    /**
+     * @brief Finds the index of the largest element in the vector.
+     *
+     * This function iterates through the vector to find the index of the largest element.
+     * It requires that the elements of the vector support basic comparison operations.
+     *
+     * @return size_type The index of the largest element in the vector.
+     *         If the vector is empty, returns npos.
+     */
+    inline size_type biggest() const
+        requires has_basic_comp<T>
+    {
+        size_type index = 0;
+        for (size_type i = 1; i < size(); i++) {
+            if (data[i] > data[index]) {
+                index = i;
+            }
+        }
+
+        return size() ? index : npos;
+    }
+
+    /**
+     * @brief Finds the index of the smallest element in the vector.
+     *
+     * This function iterates through the vector to find the index of the smallest element.
+     * It requires that the elements of the vector support basic comparison operations.
+     *
+     * @return size_type The index of the smallest element in the vector.
+     *         If the vector is empty, returns npos.
+     */
+    inline size_type smallest() const
+        requires has_basic_comp<T>
+    {
+        size_type index = 0;
+        for (size_type i = 1; i < size(); i++) {
+            if (data[i] < data[index]) {
+                index = i;
+            }
+        }
+
+        return size() ? index : npos;
+    }
+
+    /**
+     * @brief Computes the sum of all elements in the vector.
+     *
+     * This function calculates the sum of all elements in the vector.
+     * It requires that the elements of the vector are of an arithmetic type.
+     *
+     * @return T The sum of all elements in the vector.
+     */
+    inline T sum() const
+        requires std::is_arithmetic_v<T>
+    {
+        return std::accumulate(begin(), end(), T(0));
+    }
+
+    /**
+     * @brief Computes the product of all elements in the vector.
+     *
+     * This function calculates the product of all elements in the vector.
+     * It requires that the elements of the vector are of an arithmetic type.
+     *
+     * @return T The product of all elements in the vector.
+     */
+    inline T product() const
+        requires std::is_arithmetic_v<T>
+    {
+        return std::accumulate(begin(), end(), T(1), std::multiplies<T>());
+    }
+
+    /**
+     * @brief Computes the mean (average) of all elements in the vector.
+     *
+     * This function calculates the mean of all elements in the vector.
+     * It requires that the elements of the vector are of an arithmetic type.
+     *
+     * @return T The mean of all elements in the vector.
+     */
+    inline T mean() const
+        requires std::is_arithmetic_v<T>
+    {
+        return sum() / size();
+    }
+
+    /**
+     * @brief Computes the median of all elements in the vector.
+     *
+     * This function calculates the median of all elements in the vector.
+     * It requires that the elements of the vector are of an arithmetic type.
+     *
+     * @return T The median of all elements in the vector.
+     */
+    inline T median() const
+        requires std::is_arithmetic_v<T>
+    {
+        vector<T, Allocator> copy(*this);
+        std::sort(copy.begin(), copy.end());
+        if (size() % 2 == 0) {
+            return (copy[size() / 2 - 1] + copy[size() / 2]) / 2;
+        }
+        return copy[size() / 2];
+    }
+
+    /**
      * @brief Constructs an element in-place at the end of the container.
      *
      * This function constructs a new element at the end of the container using the provided arguments.
@@ -600,11 +998,28 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
      * storage to free up unused memory.
      */
     inline void shrink_to_fit() {
-        if (capacity() > size()) {
-            size_type sz = size();
-            data = allocator().realloc(data, sz);
-            data_end = data + sz;
-            capacity_end = data_end;
+        if constexpr (std::is_trivially_copyable<T>::value) {
+            if (capacity() > size()) {
+                size_type sz = size();
+                data = allocator().realloc(data, sz);
+                data_end = data + sz;
+                capacity_end = data_end;
+            }
+        } else {
+            if (size() < capacity()) {
+                T *new_data = allocator().malloc(size());
+                T *new_data_end = new_data;
+                for (T *ptr = data; ptr != data_end; ++ptr, ++new_data_end) {
+                    new (new_data_end) T(std::move(*ptr));
+                    ptr->~T();
+                }
+                if (data) {
+                    allocator().free(data, capacity());
+                }
+                data = new_data;
+                data_end = new_data_end;
+                capacity_end = data + size();
+            }
         }
     }
 
@@ -620,13 +1035,20 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
      *       the function does nothing.
      */
     inline void erase(size_type index) {
-        if (index < size()) {
-            data[index].~T();
-            for (size_type i = index; i < size() - 1; ++i) {
-                new (data + i) T(std::move(data[i + 1]));
-                data[i + 1].~T();
+        if constexpr (std::is_trivially_copyable<T>::value) {
+            if (index < size()) {
+                memmove(data + index, data + index + 1, (size() - index - 1) * sizeof(T));
+                --data_end;
             }
-            --data_end;
+        } else {
+            if (index < size()) {
+                data[index].~T();
+                for (size_type i = index; i < size() - 1; ++i) {
+                    new (data + i) T(std::move(data[i + 1]));
+                    data[i + 1].~T();
+                }
+                --data_end;
+            }
         }
     }
 
@@ -641,16 +1063,23 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
      * @param end_index The ending index of the range to erase (exclusive).
      */
     inline void erase(size_type start_index, size_type end_index) {
-        if (start_index < size() && end_index <= size() && start_index < end_index) {
-            for (size_type i = start_index; i < end_index; ++i) {
-                data[i].~T();
+        if constexpr (std::is_trivially_copyable<T>::value) {
+            if (start_index < size() && end_index <= size() && start_index < end_index) {
+                memmove(data + start_index, data + end_index, (size() - end_index) * sizeof(T));
+                data_end -= end_index - start_index;
+            } else {
+                if (start_index < size() && end_index <= size() && start_index < end_index) {
+                    for (size_type i = start_index; i < end_index; ++i) {
+                        data[i].~T();
+                    }
+                    size_type move_count = size() - end_index;
+                    for (size_type i = 0; i < move_count; ++i) {
+                        new (data + start_index + i) T(std::move(data[end_index + i]));
+                        data[end_index + i].~T();
+                    }
+                    data_end -= (end_index - start_index);
+                }
             }
-            size_type move_count = size() - end_index;
-            for (size_type i = 0; i < move_count; ++i) {
-                new (data + start_index + i) T(std::move(data[end_index + i]));
-                data[end_index + i].~T();
-            }
-            data_end -= (end_index - start_index);
         }
     }
 
@@ -688,13 +1117,22 @@ template <class T, class Allocator = c_allocator<T>> struct vector : _allocator_
      * @param end_ptr Pointer to the end of the range of elements to be added.
      */
     inline void push_range(const T *start_ptr, const T *end_ptr) {
-        size_type count = end_ptr - start_ptr;
-        if (size() + count > capacity()) {
-            reserve(size() + count);
-        }
-        for (const T *ptr = start_ptr; ptr != end_ptr; ++ptr) {
-            new (data_end) T(*ptr);
-            ++data_end;
+        if constexpr (std::is_trivially_copyable<T>::value) {
+            size_type count = end_ptr - start_ptr;
+            if (size() + count > capacity()) {
+                reserve(size() + count);
+            }
+            memcpy(data_end, start_ptr, count * sizeof(T));
+            data_end += count;
+        } else {
+            size_type count = end_ptr - start_ptr;
+            if (size() + count > capacity()) {
+                reserve(size() + count);
+            }
+            for (const T *ptr = start_ptr; ptr != end_ptr; ++ptr) {
+                new (data_end) T(*ptr);
+                ++data_end;
+            }
         }
     }
 
