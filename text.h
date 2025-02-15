@@ -30,11 +30,19 @@ namespace containers {
  * @tparam Allocator The allocator type used for dynamic memory allocation.
  */
 template <int N = 64, class Allocator = c_allocator<char>> struct text : private _allocator_ebo<char, Allocator> {
+<<<<<<< HEAD
     static_assert(N > 3 * sizeof(std::size_t), "Text N must be bugger 3 * sizeof(std::size_t)");
   private:
     alignas(char *) char data[N];
   public:
     template <int, class> friend struct text;
+=======
+    static_assert(N >= 2 * sizeof(std::size_t), "Text N must be at least 2 * sizeof(std::size_t)");
+
+    char *data;           /**< Pointer to the underlying data array. */
+    char local_buffer[N]{}; /**< Local buffer for small strings. */
+
+>>>>>>> 135bbbf9bff8e10850f7d009ee512de4c621074d
     using value_type = char;
     using size_type = std::size_t;
     static constexpr size_type npos = static_cast<size_type>(-1);
@@ -97,6 +105,15 @@ template <int N = 64, class Allocator = c_allocator<char>> struct text : private
      * the buffer is set to the null terminator.
      */
     inline constexpr text() : _allocator_ebo<char, Allocator>() { std::memset(data, 0, N); }
+
+    /**
+     * @brief Constructs an inline text object.
+     *
+     * Initializes the text object with a local buffer, sets the size to 0,
+     * capacity to N-1, and marks the data as local. The first character of
+     * the buffer is set to the null terminator.
+     */
+    inline constexpr text() : _allocator_ebo<char, Allocator>(), data(local_buffer) { }
 
     /**
      * @brief Returns the size of the text container.
@@ -189,6 +206,7 @@ template <int N = 64, class Allocator = c_allocator<char>> struct text : private
         }
     }
 
+<<<<<<< HEAD
     /**
      * @brief Reserves memory for the container.
      *
@@ -223,6 +241,8 @@ template <int N = 64, class Allocator = c_allocator<char>> struct text : private
         }
         set_size(new_size);
     }
+=======
+>>>>>>> 135bbbf9bff8e10850f7d009ee512de4c621074d
 
     /**
      * @brief Formats a string using a printf-style format string and variable arguments.
@@ -1396,6 +1416,10 @@ template <int N = 64, class Allocator = c_allocator<char>> struct text : private
     }
 };
 } // namespace containers
+<<<<<<< HEAD
+=======
+using text16 = containers::text<16>;
+>>>>>>> 135bbbf9bff8e10850f7d009ee512de4c621074d
 using text32 = containers::text<32>;
 using text64 = containers::text<64>;
 using text128 = containers::text<128>;
@@ -1404,6 +1428,7 @@ using text512 = containers::text<512>;
 using text1024 = containers::text<1024>;
 using text2048 = containers::text<2048>;
 using text4096 = containers::text<4096>;
+<<<<<<< HEAD
 // GTR deafult string class
 using string = text64;
 
@@ -1541,5 +1566,8 @@ template <> inline string to_string(double value) {
     std::snprintf(buffer, 32, "%f", value);
     return string(buffer);
 }
+=======
+using string = text64;
+>>>>>>> 135bbbf9bff8e10850f7d009ee512de4c621074d
 } // namespace gtr
 #endif

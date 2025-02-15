@@ -25,8 +25,13 @@ template <typename Key, typename T, class HashFunc, class CompFunc, class Alloca
 template <typename Key, typename T> struct hashmap_bucket {
     Key key;
     T value;
+<<<<<<< HEAD
     using key_type = Key;
     template <typename, class, class, class, class> friend struct hashmap;
+=======
+    template <typename, class, class, class, class>
+    friend struct hashmap;
+>>>>>>> 135bbbf9bff8e10850f7d009ee512de4c621074d
     inline bool occupied() { return _flags & HASHMAP_BUCKET_OCCUPIED; }
     inline bool tombstone() { return _flags & HASHMAP_BUCKET_TOMBSTONE; }
     inline bool empty() { return !(_flags & (HASHMAP_BUCKET_OCCUPIED | HASHMAP_BUCKET_TOMBSTONE)); }
